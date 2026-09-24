@@ -7,8 +7,7 @@ Signon/UX for courses-mcp
 | --- | --- |
 | Language | TypeScript |
 | Package manager | Bun |
-| Frontend | React |
-| Backend | Node.js |
+| Framework | Next.js |
 | Authentication | Supabase Auth |
 | Database | Supabase Postgres |
 | Hosting | Cloudflare |
