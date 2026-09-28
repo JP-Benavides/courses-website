@@ -34,7 +34,8 @@ app/
 ├── page.tsx              # Website entry point
 ├── layout.tsx            # Shared page layout
 └── api/
-    └── health/route.ts   # GET /api/health
+    ├── health/route.ts   # GET /api/health
+    └── account/route.ts  # DELETE /api/account (signed-in user only)
 components/              # Frontend interface
 data/                    # Static demo data
 lib/
@@ -52,6 +53,8 @@ With the development server running, open `http://localhost:3000/api/health` to 
 | `app/page.tsx` | Verifies the current user with Supabase and renders the app. |
 | `app/auth/callback/route.ts` | Exchanges an email-confirmation/OAuth code for a cookie-backed session. |
 | `app/api/health/route.ts` | Basic backend health endpoint. |
+| `app/api/account/route.ts` | Verifies the signed-in user, deletes their Auth account, and clears session cookies. |
+| `lib/server/supabase-admin.ts` | Creates the server-only privileged Supabase client for account deletion. |
 | `lib/server/` | Home for future shared server-only logic. |
 | `proxy.ts` | Refreshes Supabase auth cookies before pages and API routes; does not enforce sign-in. |
 | `lib/supabase/client.ts` | Creates a Supabase client for browser code. |
@@ -88,6 +91,18 @@ Full name is saved as Supabase Auth user metadata for display, not authorization
 Check manually: wrong password displays an error; signup requests confirmation when enabled; successful sign-in opens the profile; refreshing preserves it; signing out and refreshing returns to the landing page. Google requires provider setup. Test the callback branches locally with `bun test tests/auth-callback.test.mjs` (Supabase is mocked; these tests do not create accounts or send email).
 
 Reference: [Supabase server-side authentication](https://supabase.com/docs/guides/auth/server-side/creating-a-client?framework=nextjs).
+
+### Account deletion
+
+Click the profile avatar, choose **Delete account**, then confirm in the dialog. Cancel is focused first. Failed deletion leaves the account screen and session in place; successful deletion clears this browser's auth cookies and reloads the landing page.
+
+Add `SUPABASE_SECRET_KEY` to `.env.local` using a secret key from the same Supabase project's API Keys settings, then restart `bun dev`. A legacy `SUPABASE_SERVICE_ROLE_KEY` is also supported as a fallback. `.env.example` contains placeholders only; do not overwrite existing `.env.local` values. Configure the same server-only secret on the deployment platform. Never add `NEXT_PUBLIC_` to this secret or commit it. Without it, the endpoint returns an unavailable error and does not delete anything.
+
+The browser sends `DELETE /api/account`. The handler checks the request's Origin, verifies the cookie-backed user with `getUser()`, then calls Supabase's admin `deleteUser()` with that verified ID. A user ID supplied by the browser is never used. The privileged client has no user session or cookies. API responses are not cached, and provider error details are not exposed.
+
+Currently this deletes the Supabase Auth account, including its user metadata. No transcript files, profile table, or real MCP credentials are stored by this website yet. When those features are added, extend deletion with their cleanup/revocation rules. Supabase can reject deletion when a user owns Storage objects; existing JWTs may remain valid until expiry, so future protected operations must also account for deleted users and token revocation. See [Supabase user management](https://supabase.com/docs/guides/auth/managing-user-data#deleting-users).
+
+Run `bun test tests/` for mocked callback and account-deletion tests. These check the verified target ID, origin/auth rejection, missing configuration, failure handling, and session-cookie clearing; they never delete real accounts. For a manual check, use a disposable account: cancel first, then confirm deletion and verify that refreshing stays signed out and the account no longer appears in Supabase Authentication → Users.
 
 ### Current demo limitations
 
