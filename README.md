@@ -27,10 +27,31 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 
 ## How the code is organized
 
+The website uses a single Next.js application for its frontend and backend. There is no separate API server or workspace; `bun dev` starts both.
+
+```text
+app/
+├── page.tsx              # Website entry point
+├── layout.tsx            # Shared page layout
+└── api/
+    └── health/route.ts   # GET /api/health
+components/              # Frontend interface
+data/                    # Static demo data
+lib/
+└── server/              # Shared backend logic, added as features are built
+public/                  # Static files
+```
+
+Next.js maps `app/api/<name>/route.ts` to `/api/<name>`. Exported functions such as `GET` and `POST` handle those HTTP methods. Reusable database and token logic will live in `lib/server/`, protected with `import "server-only";`. Token endpoints will be added once authentication and issuance are implemented; none are exposed yet.
+
+With the development server running, open `http://localhost:3000/api/health` to receive `{"status":"ok"}`. This only confirms the website API responds; it does not verify Supabase or the separate Python MCP service.
+
 | File | Responsibility |
 | --- | --- |
 | `app/layout.tsx` | Shared HTML shell, page title, and global stylesheet import. |
 | `app/page.tsx` | Next.js home route; renders the demo app. |
+| `app/api/health/route.ts` | Basic backend health endpoint. |
+| `lib/server/` | Home for future shared server-only logic. |
 | `components/coursebook-app.tsx` | Holds the selected screen and demo user's name. |
 | `components/landing-page.tsx` | Landing-page content and layout. |
 | `components/course-ticker.tsx` | Course cards and moving catalogue rows. |
