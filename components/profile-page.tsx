@@ -1,6 +1,11 @@
 import McpTab from "./mcp-tab";
 
-export default function ProfilePage({ userName, onSignOut }: { userName: string; onSignOut: () => void }) {
+export default function ProfilePage({ userName, onSignOut, signingOut, error }: {
+  userName: string;
+  onSignOut: () => void;
+  signingOut: boolean;
+  error: string;
+}) {
   const firstName = userName.split(" ")[0];
 
   return (
@@ -13,14 +18,16 @@ export default function ProfilePage({ userName, onSignOut }: { userName: string;
             <div className="w-7 h-7 rounded-full bg-[#57068c] flex items-center justify-center text-white text-[11px] font-semibold">
               {firstName[0]}
             </div>
-            <button onClick={onSignOut} className="text-[12px] text-gray-400 hover:text-gray-700 transition-colors">
-              Sign out
+            <button disabled={signingOut} onClick={onSignOut} className="text-[12px] text-gray-400 hover:text-gray-700 transition-colors">
+              {signingOut ? "Signing out…" : "Sign out"}
             </button>
           </div>
         </div>
       </header>
 
       <div className="max-w-5xl mx-auto px-6 py-10">
+
+        {error && <p role="alert" className="mb-4 text-sm text-red-700">{error}</p>}
 
         {/* Profile header */}
         <div className="mb-8">

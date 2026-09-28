@@ -1,4 +1,4 @@
-// Static demo catalogue from the imported prototype; not live Supabase data.
+// Static demo catalogue for background, not supabase data
 export const NYU_COURSES = [
   { code: "CSCI-UA 101", title: "Intro to Computer Science", credits: 4, dept: "Computer Science" },
   { code: "MATH-UA 121", title: "Calculus I", credits: 4, dept: "Mathematics" },
