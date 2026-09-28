@@ -34,7 +34,8 @@ app/
 ├── page.tsx              # Website entry point
 ├── layout.tsx            # Shared page layout
 └── api/
-    └── health/route.ts   # GET /api/health
+    ├── health/route.ts   # GET /api/health
+    └── account/route.ts  # DELETE /api/account (signed-in user only)
 components/              # Frontend interface
 data/                    # Static demo data
 lib/
@@ -49,14 +50,20 @@ With the development server running, open `http://localhost:3000/api/health` to 
 | File | Responsibility |
 | --- | --- |
 | `app/layout.tsx` | Shared HTML shell, page title, and global stylesheet import. |
-| `app/page.tsx` | Next.js home route; renders the demo app. |
+| `app/page.tsx` | Verifies the current user with Supabase and renders the app. |
+| `app/auth/callback/route.ts` | Exchanges an email-confirmation/OAuth code for a cookie-backed session. |
 | `app/api/health/route.ts` | Basic backend health endpoint. |
+| `app/api/account/route.ts` | Verifies the signed-in user, deletes their Auth account, and clears session cookies. |
+| `lib/server/supabase-admin.ts` | Creates the server-only privileged Supabase client for account deletion. |
 | `lib/server/` | Home for future shared server-only logic. |
-| `components/coursebook-app.tsx` | Holds the selected screen and demo user's name. |
+| `proxy.ts` | Refreshes Supabase auth cookies before pages and API routes; does not enforce sign-in. |
+| `lib/supabase/client.ts` | Creates a Supabase client for browser code. |
+| `lib/supabase/server.ts` | Creates a request-specific Supabase client for server code. |
+| `components/coursebook-app.tsx` | Listens for auth changes, displays the signed-in account, and signs out. |
 | `components/landing-page.tsx` | Landing-page content and layout. |
 | `components/course-ticker.tsx` | Course cards and moving catalogue rows. |
 | `data/courses.ts` | Static example courses and department colors. |
-| `components/sign-in-page.tsx` | Demo sign-in and sign-up screens. |
+| `components/sign-in-page.tsx` | Supabase email/password forms and Google sign-in. |
 | `components/profile-page.tsx` | Account header and MCP section container. |
 | `components/mcp-tab.tsx` | Sample token, clipboard actions, and setup checkpoint display. |
 | `app/globals.css` | Tailwind, Inter font, global styles, and ticker animations. |
@@ -64,11 +71,44 @@ With the development server running, open `http://localhost:3000/api/health` to 
 
 `"use client"` marks components that need browser interactions or React state. The app controller imports the other screens, so they also run within that client boundary. `app/page.tsx` itself stays a server component.
 
-Screen navigation currently uses React state on `/`, matching the original prototype. Refreshing resets the demo; these screens do not yet have separate URLs.
+Screen navigation currently uses React state on `/`, matching the original prototype. Refreshing restores a valid Supabase session; these screens do not yet have separate URLs. The MCP demo token state still resets on refresh.
+
+### Authentication setup
+
+Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` in `.env.local`, then restart `bun dev`.
+
+In Supabase Authentication settings:
+
+1. Enable email/password authentication. With email confirmation enabled, users must follow the confirmation email before they can sign in. The UI also supports projects where confirmation is disabled.
+2. Set Site URL to the website's origin (locally `http://localhost:3000`). Add `http://localhost:3000/auth/callback` to the redirect URL allowlist; add the deployed equivalent before deployment. Keep the standard confirmation template using `{{ .ConfirmationURL }}` for this PKCE flow.
+3. Enable and configure Google before using its sign-in button. Its provider-console callback is the Supabase callback URL displayed by Supabase, not this website's `/auth/callback`.
+4. Open confirmation links in the browser that started signup: the code exchange needs its PKCE verifier cookie. Expired/failed links return to sign-in with an error.
+
+The request flow is: sign-in form → browser Supabase client → Supabase Auth → session cookies → auth event opens the profile. On a later page load, `app/page.tsx` calls `getUser()` to verify the account. OAuth and email-confirmation redirects go through `/auth/callback`. Sign-out ends the session in this browser (`scope: "local"`).
+
+Full name is saved as Supabase Auth user metadata for display, not authorization. No profile table or MCP credentials are created. Protected API operations must independently verify authentication; showing a profile in the UI is not an authorization boundary.
+
+Check manually: wrong password displays an error; signup requests confirmation when enabled; successful sign-in opens the profile; refreshing preserves it; signing out and refreshing returns to the landing page. Google requires provider setup. Test the callback branches locally with `bun test tests/auth-callback.test.mjs` (Supabase is mocked; these tests do not create accounts or send email).
+
+Reference: [Supabase server-side authentication](https://supabase.com/docs/guides/auth/server-side/creating-a-client?framework=nextjs).
+
+### Account deletion
+
+Click the profile avatar, choose **Delete account**, then confirm in the dialog. Cancel is focused first. Failed deletion leaves the account screen and session in place; successful deletion clears this browser's auth cookies and reloads the landing page.
+
+Add `SUPABASE_SECRET_KEY` to `.env.local` using a secret key from the same Supabase project's API Keys settings, then restart `bun dev`. A legacy `SUPABASE_SERVICE_ROLE_KEY` is also supported as a fallback. `.env.example` contains placeholders only; do not overwrite existing `.env.local` values. Configure the same server-only secret on the deployment platform. Never add `NEXT_PUBLIC_` to this secret or commit it. Without it, the endpoint returns an unavailable error and does not delete anything.
+
+The browser sends `DELETE /api/account`. The handler checks the request's Origin, verifies the cookie-backed user with `getUser()`, then calls Supabase's admin `deleteUser()` with that verified ID. A user ID supplied by the browser is never used. The privileged client has no user session or cookies. API responses are not cached, and provider error details are not exposed.
+
+Currently this deletes the Supabase Auth account, including its user metadata. No transcript files, profile table, or real MCP credentials are stored by this website yet. When those features are added, extend deletion with their cleanup/revocation rules. Supabase can reject deletion when a user owns Storage objects; existing JWTs may remain valid until expiry, so future protected operations must also account for deleted users and token revocation. See [Supabase user management](https://supabase.com/docs/guides/auth/managing-user-data#deleting-users).
+
+Run `bun test tests/` for mocked callback and account-deletion tests. These check the verified target ID, origin/auth rejection, missing configuration, failure handling, and session-cookie clearing; they never delete real accounts. For a manual check, use a disposable account: cancel first, then confirm deletion and verify that refreshing stays signed out and the account no longer appears in Supabase Authentication → Users.
 
 ### Current demo limitations
 
-- Email/password, Google, and Apple buttons simulate sign-in; they do not authenticate or store credentials.
+Session maintenance is wired through the root `proxy.ts`. Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` in `.env.local` before opening the website. Static images, Next.js assets, and `/api/health` skip session maintenance. The proxy validates/refreshes sessions but does not redirect signed-out visitors or authorize protected operations.
+
+- Sign-in is connected to Supabase; Google requires provider configuration. Live email delivery and provider credentials have not been verified by automated tests.
 - The sample token cannot access the MCP. The second checkpoint stays pending; no backend verification is connected.
 - Course data is static prototype content, not a live or verified catalog.
 - The imported `How it works` button has no action yet, and the export does not include the future academic-context tab.
