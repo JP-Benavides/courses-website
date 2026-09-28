@@ -65,13 +65,21 @@ With the development server running, open `http://localhost:3000/api/health` to 
 | `data/courses.ts` | Static example courses and department colors. |
 | `components/sign-in-page.tsx` | Supabase email/password forms and Google sign-in. |
 | `components/profile-page.tsx` | Account header and MCP section container. |
-| `components/mcp-tab.tsx` | Sample token, clipboard actions, and setup checkpoint display. |
+| `components/mcp-tab.tsx` | Copyable MCP URL, clipboard actions, and setup checkpoint display. |
 | `app/globals.css` | Tailwind, Inter font, global styles, and ticker animations. |
 | `public/design-references/` | Preserved reference images from the export; not used by the UI. |
 
 `"use client"` marks components that need browser interactions or React state. The app controller imports the other screens, so they also run within that client boundary. `app/page.tsx` itself stays a server component.
 
-Screen navigation currently uses React state on `/`, matching the original prototype. Refreshing restores a valid Supabase session; these screens do not yet have separate URLs. The MCP demo token state still resets on refresh.
+Screen navigation currently uses React state on `/`, matching the original prototype. Refreshing restores a valid Supabase session; these screens do not yet have separate URLs. The MCP setup shows the configured public MCP URL; it does not issue credentials.
+
+### MCP URL setup
+
+Set `NEXT_PUBLIC_MCP_URL` in `.env.local` to the full public HTTPS endpoint for the separate MCP service, including `/mcp`, then restart `bun dev`. Use the publicly reachable service URL for remote assistants such as ChatGPT, not the website URL or localhost. Until configured, the profile shows “MCP URL coming soon” and disables copying.
+
+Development currently uses a temporary ngrok endpoint. Update this variable if the tunnel URL changes or the MCP moves to its permanent host.
+
+Set the same variable on the deployment platform before building. Next.js includes `NEXT_PUBLIC_` values in the browser bundle at build time, so changing the deployed URL requires a new build. This URL is public configuration, not a credential; it does not change the MCP service’s authentication requirements or connect the assistant automatically.
 
 ### Authentication setup
 
@@ -109,7 +117,7 @@ Run `bun test tests/` for mocked callback and account-deletion tests. These chec
 Session maintenance is wired through the root `proxy.ts`. Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` in `.env.local` before opening the website. Static images, Next.js assets, and `/api/health` skip session maintenance. The proxy validates/refreshes sessions but does not redirect signed-out visitors or authorize protected operations.
 
 - Sign-in is connected to Supabase; Google requires provider configuration. Live email delivery and provider credentials have not been verified by automated tests.
-- The sample token cannot access the MCP. The second checkpoint stays pending; no backend verification is connected.
+- The MCP section displays the public URL from `NEXT_PUBLIC_MCP_URL` for manual assistant setup. The signed-in account completes checkpoint one. Checkpoint two stays pending because backend MCP verification is not connected.
 - Course data is static prototype content, not a live or verified catalog.
 - The imported `How it works` button has no action yet, and the export does not include the future academic-context tab.
 - The font currently loads from Google Fonts in the browser, as in the export.
