@@ -1,9 +1,10 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { safeAuthReturnPath } from "@/lib/supabase/oauth";
 
 // Supabase redirects email-confirmation and OAuth flows here with a PKCE code.
 export async function GET(request: NextRequest) {
-  const destination = new URL("/", request.url);
+  const destination = new URL(safeAuthReturnPath(request.nextUrl.searchParams.get("next")), request.url);
   const response = NextResponse.redirect(destination);
   response.headers.set("Cache-Control", "no-store");
   const code = request.nextUrl.searchParams.get("code");

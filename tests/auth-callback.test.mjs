@@ -43,3 +43,14 @@ test("network failures return the same recoverable error", async () => {
   const response = await GET(request("?code=valid-code"));
   expect(response.headers.get("Location")).toContain("authError=callback");
 });
+
+
+test("callback resumes the consent request after login and on recoverable failures", async () => {
+  const next = encodeURIComponent("/oauth/consent?authorization_id=request-123");
+  exchange = async () => ({ error: null });
+  const success = await GET(request(`?code=valid&next=${next}`));
+  expect(success.headers.get("Location")).toBe("http://localhost:3000/oauth/consent?authorization_id=request-123");
+  exchange = async () => ({ error: new Error("invalid") });
+  const failure = await GET(request(`?code=invalid&next=${next}`));
+  expect(failure.headers.get("Location")).toBe("http://localhost:3000/oauth/consent?authorization_id=request-123&authError=callback");
+});
