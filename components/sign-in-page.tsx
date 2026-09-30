@@ -2,8 +2,20 @@
 
 import { useState, type FormEvent } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { safeAuthReturnPath } from "@/lib/supabase/oauth";
 
-export default function SignInPage({ onBack, initialError = "" }: { onBack: () => void; initialError?: string }) {
+export default function SignInPage({ onBack, initialError = "", returnTo = "/", onAuthenticated }: {
+  onBack: () => void;
+  initialError?: string;
+  returnTo?: string;
+  onAuthenticated?: () => void;
+}) {
+  function callbackUrl() {
+    const url = new URL("/auth/callback", window.location.origin);
+    const destination = safeAuthReturnPath(returnTo);
+    if (destination !== "/") url.searchParams.set("next", destination);
+    return url.toString();
+  }
   const [mode, setMode] = useState<"choose" | "signup" | "login">("choose");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -34,19 +46,22 @@ export default function SignInPage({ onBack, initialError = "" }: { onBack: () =
           password,
           options: {
             data: { full_name: name.trim() },
-            emailRedirectTo: `${window.location.origin}/auth/callback`,
+            emailRedirectTo: callbackUrl(),
           },
         });
         if (error) throw error;
         if (!data.session) {
           setMessage("Check your email for a confirmation link. Open it in this browser, then sign in. If you already have an account, use Sign in.");
           setPassword("");
+        } else {
+          onAuthenticated?.();
         }
       } else {
         const { error } = await supabase.auth.signInWithPassword({
           email: email.trim(), password,
         });
         if (error) throw error;
+        onAuthenticated?.();
       }
       // CoursebookApp listens for the resulting auth event and opens the profile.
     } catch (error) {
@@ -63,7 +78,7 @@ export default function SignInPage({ onBack, initialError = "" }: { onBack: () =
     try {
       const { error } = await createClient().auth.signInWithOAuth({
         provider: "google",
-        options: { redirectTo: `${window.location.origin}/auth/callback` },
+        options: { redirectTo: callbackUrl() },
       });
       if (error) throw error;
     } catch (error) {

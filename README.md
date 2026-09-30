@@ -43,7 +43,7 @@ lib/
 public/                  # Static files
 ```
 
-Next.js maps `app/api/<name>/route.ts` to `/api/<name>`. Exported functions such as `GET` and `POST` handle those HTTP methods. Reusable database and token logic will live in `lib/server/`, protected with `import "server-only";`. Token endpoints will be added once authentication and issuance are implemented; none are exposed yet.
+Next.js maps `app/api/<name>/route.ts` to `/api/<name>`. Exported functions such as `GET` and `POST` handle those HTTP methods. Shared privileged backend logic lives in `lib/server/`, protected with `import "server-only";`. Supabase OAuth Server handles authorization codes and token issuance; this website hosts the consent UI at `/oauth/consent` and does not expose its own token endpoints.
 
 With the development server running, open `http://localhost:3000/api/health` to receive `{"status":"ok"}`. This only confirms the website API responds; it does not verify Supabase or the separate Python MCP service.
 
@@ -65,7 +65,9 @@ With the development server running, open `http://localhost:3000/api/health` to 
 | `data/courses.ts` | Static example courses and department colors. |
 | `components/sign-in-page.tsx` | Supabase email/password forms and Google sign-in. |
 | `components/profile-page.tsx` | Account header and MCP section container. |
-| `components/mcp-tab.tsx` | Copyable MCP URL, clipboard actions, and setup checkpoint display. |
+| `components/connected-apps.tsx` | Lists Supabase OAuth grants and revokes an app’s authorization. |
+| `app/oauth/consent/page.tsx` | Hosts the Supabase OAuth consent flow for assistant connections. |
+| `components/mcp-tab.tsx` | Copyable MCP URL, assistant setup prompt, and connected-app management. |
 | `app/globals.css` | Tailwind, Inter font, global styles, and ticker animations. |
 | `public/design-references/` | Preserved reference images from the export; not used by the UI. |
 
@@ -108,7 +110,7 @@ Add `SUPABASE_SECRET_KEY` to `.env.local` using a secret key from the same Supab
 
 The browser sends `DELETE /api/account`. The handler checks the request's Origin, verifies the cookie-backed user with `getUser()`, then calls Supabase's admin `deleteUser()` with that verified ID. A user ID supplied by the browser is never used. The privileged client has no user session or cookies. API responses are not cached, and provider error details are not exposed.
 
-Currently this deletes the Supabase Auth account, including its user metadata. No transcript files, profile table, or real MCP credentials are stored by this website yet. When those features are added, extend deletion with their cleanup/revocation rules. Supabase can reject deletion when a user owns Storage objects; existing JWTs may remain valid until expiry, so future protected operations must also account for deleted users and token revocation. See [Supabase user management](https://supabase.com/docs/guides/auth/managing-user-data#deleting-users).
+Currently this deletes the Supabase Auth account, including its user metadata. No transcript files, profile table, or MCP access tokens are stored by this website. Supabase manages OAuth grants and tokens; already-issued access tokens may remain valid until expiry. When data storage is added, extend deletion with its cleanup rules. Supabase can reject deletion when a user owns Storage objects; existing JWTs may remain valid until expiry, so future protected operations must also account for deleted users and token revocation. See [Supabase user management](https://supabase.com/docs/guides/auth/managing-user-data#deleting-users).
 
 Run `bun test tests/` for mocked callback and account-deletion tests. These check the verified target ID, origin/auth rejection, missing configuration, failure handling, and session-cookie clearing; they never delete real accounts. For a manual check, use a disposable account: cancel first, then confirm deletion and verify that refreshing stays signed out and the account no longer appears in Supabase Authentication → Users.
 
@@ -117,7 +119,7 @@ Run `bun test tests/` for mocked callback and account-deletion tests. These chec
 Session maintenance is wired through the root `proxy.ts`. Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` in `.env.local` before opening the website. Static images, Next.js assets, and `/api/health` skip session maintenance. The proxy validates/refreshes sessions but does not redirect signed-out visitors or authorize protected operations.
 
 - Sign-in is connected to Supabase; Google requires provider configuration. Live email delivery and provider credentials have not been verified by automated tests.
-- The MCP section displays the public URL from `NEXT_PUBLIC_MCP_URL` for manual assistant setup. The signed-in account completes checkpoint one. Checkpoint two stays pending because backend MCP verification is not connected.
+- The MCP section displays the public URL from `NEXT_PUBLIC_MCP_URL` for manual assistant setup. It lists Supabase OAuth grants with a Disconnect action. A grant does not verify that ChatGPT can reach the MCP service; live end-to-end connection testing is still required.
 - Course data is static prototype content, not a live or verified catalog.
 - The imported `How it works` button has no action yet, and the export does not include the future academic-context tab.
 - The font currently loads from Google Fonts in the browser, as in the export.
@@ -129,3 +131,35 @@ Run `bun run lint` and `bun run build` to check the project.
 
 ## Deployment 
 Goal is to either deploy on vercel or cloudflare
+
+
+## ChatGPT OAuth connection
+
+The website hosts the Supabase OAuth Server consent UI at `/oauth/consent`.
+Enable OAuth 2.1 Server in the Supabase dashboard and set its authorization path
+(the consent page) to `/oauth/consent`, using this website as the Site URL.
+Configure the ChatGPT OAuth client and exact callback URL in Supabase; the MCP
+server uses the same project for discovery and access-token verification.
+Use asymmetric JWT signing keys. No OAuth client secret belongs in browser env vars.
+
+Existing email/password signup, email confirmation, and Google login preserve
+`authorization_id` through `/auth/callback?next=...`. Only the local consent route
+is an accepted return destination. Add the deployed `/auth/callback` URL (including
+support for its `next` query parameter) to Supabase's redirect allowlist. A real,
+non-anonymous Supabase account is required before consent is loaded or submitted.
+
+Consent displays the registered client, callback address, and requested account
+scopes. Supabase issues the authorization code and handles PKCE/token exchange;
+this website never creates or stores ChatGPT's access tokens. Existing grants may
+be redirected automatically by Supabase. Expired requests must be restarted in
+ChatGPT.
+
+The MCP tab lists the user's OAuth grants and provides a separate Disconnect
+control. Website logout continues to use `signOut({ scope: "local" })` and does
+not revoke those grants. Disconnect calls `oauth.revokeGrant({ clientId })`;
+already-issued access tokens can remain valid until expiration.
+
+OAuth account scopes do not restrict database rows. RLS policy creation and
+live cross-user RLS testing are deferred; configure policies before exposing
+private data. End-to-end ChatGPT testing still needs the deployed HTTPS URLs,
+Supabase OAuth Server settings, and a registered ChatGPT connection.

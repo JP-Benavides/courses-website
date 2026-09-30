@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import ConnectedApps from "./connected-apps";
 
 const MCP_URL = process.env.NEXT_PUBLIC_MCP_URL?.trim() ?? "";
 const PROMPT = "Use Coursebook to list the available programs.";
@@ -22,43 +23,7 @@ export default function McpTab() {
 
   return (
     <div>
-      {/* Account sign-in is complete; MCP verification is not connected yet. */}
-      <div className="mb-8 pb-8 border-b border-gray-100">
-        <div className="flex items-center justify-between gap-3 mb-3">
-          <h2 className="text-[18px] font-semibold text-gray-950" style={{ letterSpacing: "-0.02em" }}>Connection setup</h2>
-          <span className="text-[12px] text-gray-600">1 of 2 complete</span>
-        </div>
-
-        <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden mb-6" role="progressbar" aria-label="Connection setup" aria-valuenow={1} aria-valuemin={0} aria-valuemax={2}>
-          <div className="h-full w-1/2 bg-green-600 rounded-full" />
-        </div>
-
-        <div className="flex flex-col sm:flex-row sm:items-center gap-6">
-          <div className="flex items-center gap-3">
-            <div className="w-7 h-7 rounded-full bg-green-600 flex items-center justify-center shrink-0">
-              <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">
-                <path d="M2.5 6.5l3 3 5-5" stroke="white" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </div>
-            <div>
-              <p className="text-[13px] font-medium text-gray-800">Account created</p>
-              <p className="text-[11px] text-green-700">Signed in</p>
-            </div>
-          </div>
-
-          <div className="hidden sm:block flex-1 h-px bg-gray-100" />
-
-          <div className="flex items-center gap-3">
-            <div className="w-7 h-7 rounded-full border-2 border-gray-200 flex items-center justify-center shrink-0">
-              <span className="text-[11px] font-semibold text-gray-600">2</span>
-            </div>
-            <div>
-              <p className="text-[13px] font-medium text-gray-700">Confirm your connection</p>
-              <p className="text-[11px] text-gray-600">Pending · MCP verification is not connected yet</p>
-            </div>
-          </div>
-        </div>
-      </div>
+      <ConnectedApps />
 
       <div className="mb-8 pb-8 border-b border-gray-100">
         <h2 className="text-[18px] font-semibold text-gray-950 mb-1" style={{ letterSpacing: "-0.02em" }}>MCP URL</h2>
@@ -84,7 +49,7 @@ export default function McpTab() {
 
       <div>
         <h2 className="text-[18px] font-semibold text-gray-950 mb-1" style={{ letterSpacing: "-0.02em" }}>Run your MCP</h2>
-        <p className="text-[13px] text-gray-600 mb-4">Once MCP authentication is configured, ask your assistant:</p>
+        <p className="text-[13px] text-gray-600 mb-4">After authorizing Coursebook in ChatGPT, ask your assistant:</p>
         <div className="flex flex-col sm:flex-row sm:items-center gap-2">
           <div className="min-w-0 flex-1 border border-gray-200 rounded-md px-4 py-2.5 bg-gray-50">
             <code className="text-[12px] text-gray-700 break-words">{PROMPT}</code>
