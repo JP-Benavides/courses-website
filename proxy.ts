@@ -52,6 +52,11 @@ export async function proxy(request: NextRequest) {
   // Public pages still allow signed-out visitors; protected routes must check auth.
   await supabase.auth.getClaims();
 
+  if (request.nextUrl.pathname === "/oauth/consent") {
+    response.headers.set("Content-Security-Policy", "frame-ancestors 'none'");
+    response.headers.set("X-Frame-Options", "DENY");
+  }
+
   return response;
 }
 
